@@ -55,13 +55,52 @@ function markdownToSlides(markdown: string): string {
       // Italic
       html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
 
-      // Unordered lists - with fragment class for one-at-a-time reveal
-      const listRegex = /^- (.+)$/gm
-      const listMatches = html.match(listRegex)
-      if (listMatches) {
-        const listItems = listMatches.map((item) => `<li class="fragment">${item.slice(2)}</li>`).join('\n')
-        html = html.replace(/(?:^- .+$\n?)+/gm, `<ul>\n${listItems}\n</ul>`)
-      }
+      // Unordered lists - handle nested lists with indentation
+      html = html.replace(/(?:^[ ]*- .*$\n?)+/gm, (listBlock) => {
+        const lines = listBlock.split('\n').filter(line => line.match(/^[ ]*- /))
+
+        const parseList = (items: { indent: number; text: string }[], depth: number = 0): string => {
+          let result = '<ul>\n'
+          let i = 0
+
+          while (i < items.length) {
+            const item = items[i]
+            const expectedIndent = depth * 2
+
+            if (item.indent === expectedIndent) {
+              // Find nested items (items with greater indent that follow)
+              const nestedItems: { indent: number; text: string }[] = []
+              let j = i + 1
+              while (j < items.length && items[j].indent > expectedIndent) {
+                nestedItems.push(items[j])
+                j++
+              }
+
+              if (nestedItems.length > 0) {
+                result += `<li class="fragment">${item.text}\n${parseList(nestedItems, depth + 1)}</li>\n`
+              } else {
+                result += `<li class="fragment">${item.text}</li>\n`
+              }
+              i = j
+            } else {
+              i++
+            }
+          }
+
+          result += '</ul>'
+          return result
+        }
+
+        const items = lines.map(line => {
+          const match = line.match(/^([ ]*)- (.*)$/)
+          return {
+            indent: match ? match[1].length : 0,
+            text: match ? match[2] : ''
+          }
+        })
+
+        return parseList(items)
+      })
 
       // Links
       html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
@@ -223,12 +262,19 @@ export function RevealPreview({ markdown, targetSlide, themeConfig }: RevealPrev
       .reveal-wrapper .reveal a {
         color: ${themeConfig.primaryColor} !important;
       }
-      /* Ensure fragments work correctly */
-      .reveal-wrapper .reveal .fragment:not(.visible) {
+      /* Ensure non-active slides are hidden */
+      .reveal-wrapper .reveal .slides > section:not(.present) {
+        display: none !important;
         opacity: 0 !important;
         visibility: hidden !important;
       }
-      .reveal-wrapper .reveal .fragment.visible {
+      .reveal-wrapper .reveal .slides > section.present {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+      /* Show all fragments in preview mode (no step-through) */
+      .reveal-wrapper .reveal .fragment {
         opacity: 1 !important;
         visibility: visible !important;
       }
@@ -260,6 +306,13 @@ export function RevealPreview({ markdown, targetSlide, themeConfig }: RevealPrev
       revealRef.current.sync()
       revealRef.current.layout()
 
+      // Re-navigate to current slide after sync (sync resets slide state)
+      if (targetSlide !== undefined) {
+        const totalSlides = revealRef.current.getTotalSlides()
+        const safeIndex = Math.min(targetSlide, totalSlides - 1)
+        revealRef.current.slide(safeIndex, 0, 0)
+      }
+
       // Render mermaid diagrams
       const mermaidElements = slidesContainer.querySelectorAll('.mermaid')
       if (mermaidElements.length > 0) {
@@ -271,7 +324,7 @@ export function RevealPreview({ markdown, targetSlide, themeConfig }: RevealPrev
         mermaid.run({ nodes: Array.from(mermaidElements) as HTMLElement[] })
       }
     }
-  }, [resolvedHtml])
+  }, [resolvedHtml, targetSlide])
 
   // Navigate to target slide when cursor position changes
   useEffect(() => {

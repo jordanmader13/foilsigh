@@ -2,6 +2,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { EditorView } from '@codemirror/view'
+import { imageWidgetPlugin, imageWidgetTheme } from './imageWidget'
 
 interface MarkdownEditorProps {
   value: string
@@ -13,7 +14,7 @@ interface MarkdownEditorProps {
 const darkTheme = EditorView.theme({
   '&': {
     backgroundColor: '#1e1e1e',
-    color: '#d4d4d4',
+    color: '#a8a8a8',
   },
   '.cm-content': {
     caretColor: '#ffffff',
@@ -32,10 +33,15 @@ const darkTheme = EditorView.theme({
     paddingLeft: '8px',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#2a2d3a',
+    color: '#d4d4d4',
   },
   '.cm-activeLine': {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#2a2d3a',
+    color: '#ffffff !important',
+  },
+  '.cm-activeLine *': {
+    color: '#ffffff !important',
   },
   // Markdown syntax highlighting
   '.cm-header': {
@@ -82,6 +88,8 @@ export function MarkdownEditor({ value, onChange, onEditorReady, onCursorChange 
         EditorView.lineWrapping,
         darkTheme,
         cursorTracker,
+        imageWidgetPlugin,
+        imageWidgetTheme,
       ]}
       onChange={onChange}
       onCreateEditor={(view) => onEditorReady?.(view)}
