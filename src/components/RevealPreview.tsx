@@ -21,7 +21,7 @@ interface RevealPreviewProps {
   themeConfig?: ThemeConfig
 }
 
-function markdownToSlides(markdown: string): string {
+export function markdownToSlides(markdown: string): string {
   // Split by horizontal rule (---) for slides
   const slides = markdown.split(/\n---\n/)
 

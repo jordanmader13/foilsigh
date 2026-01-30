@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import type { EditorView } from '@codemirror/view'
 import './App.css'
 import { MarkdownEditor } from './components/MarkdownEditor'
-import { RevealPreview } from './components/RevealPreview'
+import { RevealPreview, markdownToSlides } from './components/RevealPreview'
 import { ImageImportModal } from './components/ImageImportModal'
 import { ThemeSettings, DEFAULT_THEME_CONFIG, type ThemeConfig } from './components/ThemeSettings'
 import { DiagramModal } from './components/DiagramModal'
@@ -133,6 +133,71 @@ function App() {
     URL.revokeObjectURL(url)
   }, [markdown])
 
+  const handleExportHTML = useCallback(async () => {
+    // Inline images from IndexedDB into the markdown
+    const exportedMarkdown = await exportWithInlinedImages(markdown)
+    // Convert to slides HTML
+    const slidesHtml = markdownToSlides(exportedMarkdown)
+
+    const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presentation</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/${themeConfig.theme}.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+      color: ${themeConfig.secondaryColor} !important;
+    }
+    .reveal {
+      color: ${themeConfig.tertiaryColor} !important;
+    }
+    .reveal p, .reveal li {
+      color: ${themeConfig.tertiaryColor} !important;
+    }
+    .reveal a {
+      color: ${themeConfig.primaryColor} !important;
+    }
+    .reveal .progress span {
+      background: ${themeConfig.primaryColor} !important;
+    }
+    .reveal .controls button {
+      color: ${themeConfig.primaryColor} !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+${slidesHtml}
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      controls: true,
+      progress: true,
+      center: true,
+      transition: 'slide'
+    });
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</body>
+</html>`
+
+    const blob = new Blob([fullHtml], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'presentation.html'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [markdown, themeConfig])
+
   const handleImportMarkdown = useCallback(() => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -169,7 +234,7 @@ function App() {
         <button className="secondary" onClick={() => setIsThemeSettingsOpen(true)}>
           Theme
         </button>
-        <button>Export HTML</button>
+        <button onClick={handleExportHTML}>Export HTML</button>
       </header>
       <main className="main-content">
         <div className="editor-pane">
